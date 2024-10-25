@@ -11,3 +11,16 @@
 (define-constant ERR-INVALID-CREDENTIAL (err u1004))
 (define-constant ERR-EXPIRED-CREDENTIAL (err u1005))
 (define-constant ERR-REVOKED-CREDENTIAL (err u1006))
+
+;; Data Variables
+(define-map identities
+    principal
+    {
+        hash: (buff 32),
+        credentials: (list 10 principal),
+        reputation-score: uint,
+        recovery-address: (optional principal),
+        last-updated: uint,
+        status: (string-ascii 20)
+    }
+)
