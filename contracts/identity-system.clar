@@ -109,3 +109,26 @@
     )
 )
 
+;; Credential Management
+(define-public (issue-credential 
+    (subject principal)
+    (claim-hash (buff 32))
+    (expiration uint)
+    (metadata (string-utf8 256)))
+    (let
+        (
+            (sender tx-sender)
+            (credential-id (generate-credential-id sender subject claim-hash))
+        )
+        (asserts! (map-get? identities sender) ERR-NOT-REGISTERED)
+        (asserts! (map-get? identities subject) ERR-NOT-REGISTERED)
+        (ok (map-set credentials credential-id {
+            issuer: sender,
+            subject: subject,
+            claim-hash: claim-hash,
+            expiration: expiration,
+            revoked: false,
+            metadata: metadata
+        }))
+    )
+)
