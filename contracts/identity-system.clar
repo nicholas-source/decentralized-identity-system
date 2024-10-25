@@ -161,3 +161,23 @@
                 { reputation-score: (+ (get reputation-score (unwrap-panic identity)) score-change) })))
     )
 )
+
+;; Recovery Mechanisms
+(define-public (initiate-recovery (identity principal) (new-hash (buff 32)))
+    (let
+        (
+            (sender tx-sender)
+            (identity-data (map-get? identities identity))
+        )
+        (asserts! (is-some identity-data) ERR-NOT-REGISTERED)
+        (asserts! (is-some (get recovery-address (unwrap-panic identity-data))) ERR-NOT-AUTHORIZED)
+        (asserts! (is-eq sender (unwrap-panic (get recovery-address (unwrap-panic identity-data)))) ERR-NOT-AUTHORIZED)
+        (ok (map-set identities identity
+            (merge (unwrap-panic identity-data)
+                { 
+                    hash: new-hash,
+                    last-updated: block-height,
+                    status: "RECOVERED"
+                })))
+    )
+)
