@@ -58,3 +58,23 @@
         (ok (var-set admin new-admin))
     )
 )
+
+
+;; Identity Management
+(define-public (register-identity (identity-hash (buff 32)) (recovery-addr (optional principal)))
+    (let
+        (
+            (sender tx-sender)
+            (existing-identity (map-get? identities sender))
+        )
+        (asserts! (is-none existing-identity) ERR-ALREADY-REGISTERED)
+        (ok (map-set identities sender {
+            hash: identity-hash,
+            credentials: (list),
+            reputation-score: u100,
+            recovery-address: recovery-addr,
+            last-updated: block-height,
+            status: "ACTIVE"
+        }))
+    )
+)
