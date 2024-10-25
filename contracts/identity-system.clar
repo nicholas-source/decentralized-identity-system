@@ -95,3 +95,17 @@
         }))
     )
 )
+
+(define-public (verify-proof (proof-hash (buff 32)))
+    (let
+        (
+            (proof (map-get? zero-knowledge-proofs proof-hash))
+            (sender tx-sender)
+        )
+        (asserts! (is-some proof) ERR-INVALID-PROOF)
+        (asserts! (is-eq sender (var-get admin)) ERR-NOT-AUTHORIZED)
+        (ok (map-set zero-knowledge-proofs proof-hash 
+            (merge (unwrap-panic proof) { verified: true })))
+    )
+)
+
