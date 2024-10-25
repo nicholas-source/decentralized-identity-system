@@ -196,3 +196,16 @@
 (define-read-only (get-credential (credential-id principal))
     (map-get? credentials credential-id)
 )
+
+(define-read-only (verify-credential (credential-id principal))
+    (let
+        (
+            (credential (map-get? credentials credential-id))
+        )
+        (asserts! (is-some credential) ERR-INVALID-CREDENTIAL)
+        (and
+            (not (get revoked (unwrap-panic credential)))
+            (< block-height (get expiration (unwrap-panic credential)))
+        )
+    )
+)
