@@ -1,8 +1,6 @@
 ;; Decentralized Identity System
 ;; Version: 1.0.0
 
-(use-trait sip-010-trait 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard.sip-010-trait)
-
 ;; Error codes
 (define-constant ERR-NOT-AUTHORIZED (err u1000))
 (define-constant ERR-ALREADY-REGISTERED (err u1001))
@@ -11,6 +9,7 @@
 (define-constant ERR-INVALID-CREDENTIAL (err u1004))
 (define-constant ERR-EXPIRED-CREDENTIAL (err u1005))
 (define-constant ERR-REVOKED-CREDENTIAL (err u1006))
+(define-constant ERR-INVALID-SCORE (err u1007))
 
 ;; Data Variables
 (define-map identities
@@ -26,9 +25,8 @@
 )
 
 (define-map credentials
-    principal
+    {issuer: principal, nonce: uint}
     {
-        issuer: principal,
         subject: principal,
         claim-hash: (buff 32),
         expiration: uint,
@@ -48,6 +46,7 @@
 )
 
 (define-data-var admin principal tx-sender)
+(define-data-var credential-nonce uint u0)
 
 ;; Implementation
 
@@ -117,12 +116,15 @@
     (let
         (
             (sender tx-sender)
-            (credential-id (generate-credential-id sender subject claim-hash))
+            (current-nonce (var-get credential-nonce))
+            (credential-id {issuer: sender, nonce: current-nonce})
+            (issuer-identity (map-get? identities sender))
+            (subject-identity (map-get? identities subject))
         )
-        (asserts! (map-get? identities sender) ERR-NOT-REGISTERED)
-        (asserts! (map-get? identities subject) ERR-NOT-REGISTERED)
+        (asserts! (is-some issuer-identity) ERR-NOT-REGISTERED)
+        (asserts! (is-some subject-identity) ERR-NOT-REGISTERED)
+        (var-set credential-nonce (+ current-nonce u1))
         (ok (map-set credentials credential-id {
-            issuer: sender,
             subject: subject,
             claim-hash: claim-hash,
             expiration: expiration,
@@ -132,31 +134,43 @@
     )
 )
 
-(define-public (revoke-credential (credential-id principal))
+(define-public (revoke-credential (issuer principal) (nonce uint))
     (let
         (
             (sender tx-sender)
+            (credential-id {issuer: issuer, nonce: nonce})
             (credential (map-get? credentials credential-id))
         )
         (asserts! (is-some credential) ERR-INVALID-CREDENTIAL)
-        (asserts! (is-eq sender (get issuer (unwrap-panic credential))) ERR-NOT-AUTHORIZED)
+        (asserts! (is-eq sender issuer) ERR-NOT-AUTHORIZED)
         (ok (map-set credentials credential-id 
             (merge (unwrap-panic credential) { revoked: true })))
     )
 )
 
 ;; Reputation System
+;; Reputation System
 (define-public (update-reputation (subject principal) (score-change int))
     (let
         (
             (sender tx-sender)
             (identity (map-get? identities subject))
+            (current-score (get reputation-score (unwrap-panic identity)))
+            (score-change-abs (if (< score-change 0) (* score-change -1) score-change))
         )
         (asserts! (is-eq sender (var-get admin)) ERR-NOT-AUTHORIZED)
         (asserts! (is-some identity) ERR-NOT-REGISTERED)
+        (asserts! (or 
+            (> score-change 0)
+            (>= (to-int current-score) score-change-abs)
+        ) ERR-INVALID-SCORE)
+        
         (ok (map-set identities subject
             (merge (unwrap-panic identity)
-                { reputation-score: (+ (get reputation-score (unwrap-panic identity)) score-change) })))
+                { reputation-score: (if (> score-change 0)
+                    (+ current-score (to-uint score-change))
+                    (to-uint (- (to-int current-score) score-change-abs))
+                )})))
     )
 )
 
@@ -180,30 +194,25 @@
     )
 )
 
-;; Helper Functions
-(define-private (generate-credential-id (issuer principal) (subject principal) (claim-hash (buff 32)))
-    (sha256 (concat (concat (principal-to-buff issuer) (principal-to-buff subject)) claim-hash))
-)
-
 ;; Getters
 (define-read-only (get-identity (identity principal))
     (map-get? identities identity)
 )
 
-(define-read-only (get-credential (credential-id principal))
-    (map-get? credentials credential-id)
+(define-read-only (get-credential (issuer principal) (nonce uint))
+    (map-get? credentials {issuer: issuer, nonce: nonce})
 )
 
-(define-read-only (verify-credential (credential-id principal))
+(define-read-only (verify-credential (issuer principal) (nonce uint))
     (let
         (
-            (credential (map-get? credentials credential-id))
+            (credential (map-get? credentials {issuer: issuer, nonce: nonce}))
         )
         (asserts! (is-some credential) ERR-INVALID-CREDENTIAL)
-        (and
+        (ok (and
             (not (get revoked (unwrap-panic credential)))
             (< block-height (get expiration (unwrap-panic credential)))
-        )
+        ))
     )
 )
 
