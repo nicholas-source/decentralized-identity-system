@@ -181,3 +181,8 @@
                 })))
     )
 )
+
+;; Helper Functions
+(define-private (generate-credential-id (issuer principal) (subject principal) (claim-hash (buff 32)))
+    (sha256 (concat (concat (principal-to-buff issuer) (principal-to-buff subject)) claim-hash))
+)
