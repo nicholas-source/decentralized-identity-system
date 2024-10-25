@@ -24,3 +24,15 @@
         status: (string-ascii 20)
     }
 )
+
+(define-map credentials
+    principal
+    {
+        issuer: principal,
+        subject: principal,
+        claim-hash: (buff 32),
+        expiration: uint,
+        revoked: bool,
+        metadata: (string-utf8 256)
+    }
+)
