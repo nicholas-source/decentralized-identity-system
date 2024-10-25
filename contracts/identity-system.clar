@@ -59,7 +59,6 @@
     )
 )
 
-
 ;; Identity Management
 (define-public (register-identity (identity-hash (buff 32)) (recovery-addr (optional principal)))
     (let
@@ -146,7 +145,6 @@
     )
 )
 
-
 ;; Reputation System
 (define-public (update-reputation (subject principal) (score-change int))
     (let
@@ -187,8 +185,7 @@
     (sha256 (concat (concat (principal-to-buff issuer) (principal-to-buff subject)) claim-hash))
 )
 
-
-; Getters
+;; Getters
 (define-read-only (get-identity (identity principal))
     (map-get? identities identity)
 )
@@ -208,4 +205,8 @@
             (< block-height (get expiration (unwrap-panic credential)))
         )
     )
+)
+
+(define-read-only (get-proof (proof-hash (buff 32)))
+    (map-get? zero-knowledge-proofs proof-hash)
 )
