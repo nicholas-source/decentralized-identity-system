@@ -192,3 +192,7 @@
 (define-read-only (get-identity (identity principal))
     (map-get? identities identity)
 )
+
+(define-read-only (get-credential (credential-id principal))
+    (map-get? credentials credential-id)
+)
