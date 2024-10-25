@@ -12,12 +12,15 @@
 (define-constant ERR-INVALID-SCORE (err u1007))
 (define-constant ERR-INVALID-INPUT (err u1008))
 (define-constant ERR-INVALID-EXPIRATION (err u1009))
+(define-constant ERR-INVALID-RECOVERY-ADDRESS (err u1010))
+(define-constant ERR-INVALID-PROOF-DATA (err u1011))
 
 ;; Constants for input validation
 (define-constant MIN-REPUTATION-SCORE u0)
 (define-constant MAX-REPUTATION-SCORE u1000)
 (define-constant MIN-EXPIRATION-BLOCKS u1)
 (define-constant MAX-METADATA-LENGTH u256)
+(define-constant MINIMUM-PROOF-SIZE u64)  ;; Minimum size for valid proof data
 
 
 ;; Data Variables
@@ -57,6 +60,29 @@
 (define-data-var admin principal tx-sender)
 (define-data-var credential-nonce uint u0)
 
+;; Enhanced input validation functions
+(define-private (is-valid-recovery-address (recovery-addr (optional principal)))
+    (match recovery-addr
+        recovery-principal (and 
+            (not (is-eq recovery-principal tx-sender))  ;; Can't set self as recovery
+            (not (is-eq recovery-principal (var-get admin)))  ;; Can't set admin as recovery
+        )
+        true  ;; None is valid
+    )
+)
+
+(define-private (is-valid-proof-data (proof-data (buff 1024)))
+    (let
+        (
+            (proof-len (len proof-data))
+        )
+        (and
+            (>= proof-len MINIMUM-PROOF-SIZE)  ;; Ensure minimum size
+            (not (is-eq proof-data 0x))  ;; Not empty
+        )
+    )
+)
+
 ;; Input validation functions
 (define-private (is-valid-expiration (expiration uint))
     (> expiration (+ block-height MIN-EXPIRATION-BLOCKS))
@@ -89,12 +115,12 @@
             (sender tx-sender)
             (existing-identity (map-get? identities sender))
         )
+        ;; Input validation
         (asserts! (is-none existing-identity) ERR-ALREADY-REGISTERED)
         (asserts! (is-valid-hash identity-hash) ERR-INVALID-INPUT)
-        (match recovery-addr
-            recovery-principal (asserts! (not (is-eq recovery-principal sender)) ERR-INVALID-INPUT)
-            true
-        )
+        (asserts! (is-valid-recovery-address recovery-addr) ERR-INVALID-RECOVERY-ADDRESS)
+        
+        ;; Proceed with registration
         (ok (map-set identities sender {
             hash: identity-hash,
             credentials: (list),
@@ -106,16 +132,21 @@
     )
 )
 
-
 ;; Zero-Knowledge Proof Functions
 (define-public (submit-proof (proof-hash (buff 32)) (proof-data (buff 1024)))
     (let
         (
             (sender tx-sender)
             (existing-identity (map-get? identities sender))
+            (existing-proof (map-get? zero-knowledge-proofs proof-hash))
         )
+        ;; Input validation
         (asserts! (is-some existing-identity) ERR-NOT-REGISTERED)
         (asserts! (is-valid-hash proof-hash) ERR-INVALID-INPUT)
+        (asserts! (is-valid-proof-data proof-data) ERR-INVALID-PROOF-DATA)
+        (asserts! (is-none existing-proof) ERR-INVALID-PROOF)  ;; Prevent proof hash collisions
+        
+        ;; Proceed with proof submission
         (ok (map-set zero-knowledge-proofs proof-hash {
             prover: sender,
             verified: false,
