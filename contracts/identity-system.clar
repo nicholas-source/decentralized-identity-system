@@ -10,6 +10,15 @@
 (define-constant ERR-EXPIRED-CREDENTIAL (err u1005))
 (define-constant ERR-REVOKED-CREDENTIAL (err u1006))
 (define-constant ERR-INVALID-SCORE (err u1007))
+(define-constant ERR-INVALID-INPUT (err u1008))
+(define-constant ERR-INVALID-EXPIRATION (err u1009))
+
+;; Constants for input validation
+(define-constant MIN-REPUTATION-SCORE u0)
+(define-constant MAX-REPUTATION-SCORE u1000)
+(define-constant MIN-EXPIRATION-BLOCKS u1)
+(define-constant MAX-METADATA-LENGTH u256)
+
 
 ;; Data Variables
 (define-map identities
@@ -48,15 +57,30 @@
 (define-data-var admin principal tx-sender)
 (define-data-var credential-nonce uint u0)
 
+;; Input validation functions
+(define-private (is-valid-expiration (expiration uint))
+    (> expiration (+ block-height MIN-EXPIRATION-BLOCKS))
+)
+
+(define-private (is-valid-metadata-length (metadata (string-utf8 256)))
+    (<= (len metadata) MAX-METADATA-LENGTH)
+)
+
+(define-private (is-valid-hash (hash (buff 32)))
+    (not (is-eq hash 0x0000000000000000000000000000000000000000000000000000000000000000))
+)
+
 ;; Implementation
 
 ;; Administrative Functions
 (define-public (set-admin (new-admin principal))
     (begin
         (asserts! (is-eq tx-sender (var-get admin)) ERR-NOT-AUTHORIZED)
+        (asserts! (not (is-eq new-admin tx-sender)) ERR-INVALID-INPUT)  ;; Prevent setting self as admin
         (ok (var-set admin new-admin))
     )
 )
+
 
 ;; Identity Management
 (define-public (register-identity (identity-hash (buff 32)) (recovery-addr (optional principal)))
@@ -66,6 +90,11 @@
             (existing-identity (map-get? identities sender))
         )
         (asserts! (is-none existing-identity) ERR-ALREADY-REGISTERED)
+        (asserts! (is-valid-hash identity-hash) ERR-INVALID-INPUT)
+        (match recovery-addr
+            recovery-principal (asserts! (not (is-eq recovery-principal sender)) ERR-INVALID-INPUT)
+            true
+        )
         (ok (map-set identities sender {
             hash: identity-hash,
             credentials: (list),
@@ -77,6 +106,7 @@
     )
 )
 
+
 ;; Zero-Knowledge Proof Functions
 (define-public (submit-proof (proof-hash (buff 32)) (proof-data (buff 1024)))
     (let
@@ -85,6 +115,7 @@
             (existing-identity (map-get? identities sender))
         )
         (asserts! (is-some existing-identity) ERR-NOT-REGISTERED)
+        (asserts! (is-valid-hash proof-hash) ERR-INVALID-INPUT)
         (ok (map-set zero-knowledge-proofs proof-hash {
             prover: sender,
             verified: false,
@@ -107,6 +138,7 @@
     )
 )
 
+
 ;; Credential Management
 (define-public (issue-credential 
     (subject principal)
@@ -123,6 +155,9 @@
         )
         (asserts! (is-some issuer-identity) ERR-NOT-REGISTERED)
         (asserts! (is-some subject-identity) ERR-NOT-REGISTERED)
+        (asserts! (is-valid-hash claim-hash) ERR-INVALID-INPUT)
+        (asserts! (is-valid-expiration expiration) ERR-INVALID-EXPIRATION)
+        (asserts! (is-valid-metadata-length metadata) ERR-INVALID-INPUT)
         (var-set credential-nonce (+ current-nonce u1))
         (ok (map-set credentials credential-id {
             subject: subject,
