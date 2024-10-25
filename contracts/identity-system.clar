@@ -145,3 +145,19 @@
             (merge (unwrap-panic credential) { revoked: true })))
     )
 )
+
+
+;; Reputation System
+(define-public (update-reputation (subject principal) (score-change int))
+    (let
+        (
+            (sender tx-sender)
+            (identity (map-get? identities subject))
+        )
+        (asserts! (is-eq sender (var-get admin)) ERR-NOT-AUTHORIZED)
+        (asserts! (is-some identity) ERR-NOT-REGISTERED)
+        (ok (map-set identities subject
+            (merge (unwrap-panic identity)
+                { reputation-score: (+ (get reputation-score (unwrap-panic identity)) score-change) })))
+    )
+)
