@@ -48,3 +48,13 @@
 )
 
 (define-data-var admin principal tx-sender)
+
+;; Implementation
+
+;; Administrative Functions
+(define-public (set-admin (new-admin principal))
+    (begin
+        (asserts! (is-eq tx-sender (var-get admin)) ERR-NOT-AUTHORIZED)
+        (ok (var-set admin new-admin))
+    )
+)
