@@ -36,3 +36,15 @@
         metadata: (string-utf8 256)
     }
 )
+
+(define-map zero-knowledge-proofs
+    (buff 32)
+    {
+        prover: principal,
+        verified: bool,
+        timestamp: uint,
+        proof-data: (buff 1024)
+    }
+)
+
+(define-data-var admin principal tx-sender)
