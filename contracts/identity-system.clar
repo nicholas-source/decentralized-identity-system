@@ -78,3 +78,20 @@
         }))
     )
 )
+
+;; Zero-Knowledge Proof Functions
+(define-public (submit-proof (proof-hash (buff 32)) (proof-data (buff 1024)))
+    (let
+        (
+            (sender tx-sender)
+            (existing-identity (map-get? identities sender))
+        )
+        (asserts! (is-some existing-identity) ERR-NOT-REGISTERED)
+        (ok (map-set zero-knowledge-proofs proof-hash {
+            prover: sender,
+            verified: false,
+            timestamp: block-height,
+            proof-data: proof-data
+        }))
+    )
+)
