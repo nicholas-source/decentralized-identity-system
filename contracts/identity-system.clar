@@ -132,3 +132,16 @@
         }))
     )
 )
+
+(define-public (revoke-credential (credential-id principal))
+    (let
+        (
+            (sender tx-sender)
+            (credential (map-get? credentials credential-id))
+        )
+        (asserts! (is-some credential) ERR-INVALID-CREDENTIAL)
+        (asserts! (is-eq sender (get issuer (unwrap-panic credential))) ERR-NOT-AUTHORIZED)
+        (ok (map-set credentials credential-id 
+            (merge (unwrap-panic credential) { revoked: true })))
+    )
+)
